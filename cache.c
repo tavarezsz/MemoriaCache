@@ -10,8 +10,7 @@ typedef struct{
     int tag;
     int valido; //indica se o bloco foi carregado da memoria, para evitar ler lixo no inicio do programa quando a cache 
                 //ainda não foi totalmente preenchida
-                //podemos usar como a tag do write-back também(0-lixo,1-valido,2-valido e alterado)
-
+    int modificado;
     int ultimoUso; //para o LRU
 } Bloco;
 
@@ -83,6 +82,7 @@ int main(){
         {
             cache.conjuntos[i].blocos[j].valido = 0;
             cache.conjuntos[i].blocos[j].tag=-1;
+            cache.conjuntos[i].blocos[j].modificado = 0;
             cache.conjuntos[i].blocos[j].ultimoUso=0;
         }
     }
