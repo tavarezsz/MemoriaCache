@@ -151,7 +151,7 @@ void acesso(Cache *cache, int endereco, char operacao, Variaveis *variaveis){
         linha->ultimoUso = 0;
 
     }
-
+}
 
 
 Cache* inicializarCache(int tamBloco, int numLinhas, int associatividade, 
