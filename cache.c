@@ -100,9 +100,8 @@ void acesso(Cache *cache, int endereco, char operacao, Variaveis *variaveis){
             linha->ultimoUso++;
         }
 
-        if (linha->valido && linha->tag == tag) {
+        if (linha->valido && linha->tag == tag && linhaConjunto == -1) {
             linhaConjunto = i;
-            break;
         }
     }
 
@@ -130,6 +129,8 @@ void acesso(Cache *cache, int endereco, char operacao, Variaveis *variaveis){
             variaveis->leiturasMP++;
         } else {
             variaveis->missesEscrita++;
+            variaveis->leiturasMP++;
+            
             if (cache->politicaEscrita == 0) {
                 variaveis->escritasMP++;
             }
@@ -150,8 +151,8 @@ void acesso(Cache *cache, int endereco, char operacao, Variaveis *variaveis){
         linha->ultimoUso = 0;
 
     }
-
 }
+
 
 Cache* inicializarCache(int tamBloco, int numLinhas, int associatividade, 
                  int politicaEscrita, int politicaSubstituicao, int tempoAcerto) {
@@ -208,8 +209,8 @@ int main(){
     char arquivoSaida[100];
 
     //por enquanto vai ser o de teste
-    //printf("Digite o nome do arquivo de entrada: ");
-    //scanf("%s", arquivoEntrada);
+    printf("Digite o nome do arquivo de entrada: ");
+    scanf("%s", arquivoEntrada);
 
     printf("Digite o nome do arquivo de saída: ");
     scanf("%s", arquivoSaida);
@@ -265,7 +266,7 @@ int main(){
 
     fclose(f);
 
-    //o enuncido diz que tem q atualizar a MP após o término da simulação (nos casos de write-through)
+    //o enuncido diz que tem q atualizar a MP após o término da simulação (nos casos de write-back)
     if(cache->politicaEscrita == 1){
         atualizarMP(cache, &vars);
     }
