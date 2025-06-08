@@ -129,11 +129,13 @@ void acesso(Cache *cache, int endereco, char operacao, Variaveis *variaveis){
             variaveis->leiturasMP++;
         } else {
             variaveis->missesEscrita++;
-            variaveis->leiturasMP++;
-            
+                    
             if (cache->politicaEscrita == 0) {
                 variaveis->escritasMP++;
+                return; //write-trough usa no-write-allocate e não altera a cache, escreve só na mp
             }
+
+            variaveis->leiturasMP++;
         }
 
         int indiceLinhaASerSubstituida = encontrarBlocoParaSubstituir(cache, indexConjunto);
