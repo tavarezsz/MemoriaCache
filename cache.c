@@ -152,7 +152,7 @@ void acesso(Cache *cache, int endereco, char operacao, Variaveis *variaveis){
 
     }
 
-}
+
 
 Cache* inicializarCache(int tamBloco, int numLinhas, int associatividade, 
                  int politicaEscrita, int politicaSubstituicao, int tempoAcerto) {
