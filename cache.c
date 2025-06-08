@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <time.h>
 
-typedef struct{
-    unsigned int tag;
+typedef struct {
+    int tag;
     int valido; //indica se o bloco foi carregado da memoria, para evitar ler lixo no inicio do programa quando a cache 
                 //ainda não foi totalmente preenchida
     int modificado; //dirty
@@ -22,7 +22,7 @@ typedef struct {
     //deixar esses campos na cache pra n ter q ficar passando como parametro em tudo
     int politicaEscrita; //0 - write-through e 1 - write-back
     int politicaSubstituicao; //0 - LRU e 1 - aleatória
-    int hitTime;
+    int tempoAcerto;
 } Cache;
 
 //tem que ser configurável pelo usuário, mesmo q pros testes seja sempre 70ns
@@ -31,30 +31,125 @@ typedef struct {
     int tempoLeitura;
 } MemoriaPrincipal;
 
-void acesso(Cache *cache, char entrada[11]){
-    char endereco[9];
-    char operacao;
-    int j=0;
+typedef struct {
+    int hitsLeitura;
+    int missesLeitura;
+    int hitsEscrita;
+    int missesEscrita;
+    int leiturasMP;
+    int escritasMP;
+} Variaveis;
 
-    //separar a string de endereco e operação
-        for(int i=0;i<11;i++){
-            printf("\nChar atual %c\n",entrada[i]);
-            
-            if(entrada[i] != ' '){
-                endereco[j++] = entrada[i];
-            }
-            else{
-                operacao = entrada[i+1];
-                break;
+int potenciaDeDois(int n) {
+    int potencia = 0;
+
+    while (n > 1) {
+        n /= 2;
+        potencia++;
+    }
+
+    return potencia;
+}
+
+int encontrarBlocoParaSubstituir(Cache *cache, int indexConjunto){
+    int maxUltimoUso = -1;
+    int linhaMaxUltimoUso = -1;
+
+    Conjunto *conjunto = &cache->conjuntos[indexConjunto];
+    int i;
+
+    for(i = 0; i < cache->tamConjunto; i++){
+        if(!conjunto->linhas[i].valido) return i; //se tiver linha vazia, retorna essa linha
+        if(conjunto->linhas[i].ultimoUso > maxUltimoUso){
+            maxUltimoUso = conjunto->linhas[i].ultimoUso;
+            linhaMaxUltimoUso = i;
+        }
+    }
+
+    if(cache->politicaSubstituicao == 1) { //aleatorio
+            return rand() % cache->tamConjunto;
+    } else { //LRU
+            return linhaMaxUltimoUso;
+    }
+
+
+}
+
+
+void acesso(Cache *cache, int endereco, char operacao, Variaveis *variaveis){
+    
+    //quantidade de bits para identificar a palavra e o conjunto
+    int bitsPalavra = potenciaDeDois(cache->tamBloco);
+    int bitsConjunto = potenciaDeDois(cache-> numConjuntos);
+
+    int mascaraConjunto = (1 << bitsConjunto) - 1;  //cria um valor com n 1s no final, sendo n o numero de bits da palavra
+    int indexConjunto = (endereco >> bitsPalavra) & mascaraConjunto; //and para deixar só os bits do conjunto
+
+    //a tag é o que sobra
+    int tag = endereco >> (bitsPalavra + bitsConjunto);
+
+
+    Conjunto *conjunto = &cache->conjuntos[indexConjunto];
+    int i;
+    int linhaConjunto = -1;
+
+    for(i = 0; i < cache->tamConjunto; i++){
+        Linha *linha = &conjunto->linhas[i];
+
+        if (linha->valido) {
+            linha->ultimoUso++;
+        }
+
+        if (linha->valido && linha->tag == tag) {
+            linhaConjunto = i;
+            break;
+        }
+    }
+
+    if(linhaConjunto != -1){
+        //hit
+        Linha *linha = &conjunto->linhas[linhaConjunto];
+        linha->ultimoUso = 0;
+
+        if (operacao == 'R') {
+            variaveis->hitsLeitura++;
+        } else {
+            variaveis->hitsEscrita++;
+
+            if (cache->politicaEscrita == 0) {
+                variaveis->escritasMP++;
+            } else {
+                linha->modificado = 1;
             }
         }
-        endereco[j] = '\0';
+           
+    } else {
+        //miss
+       if (operacao == 'R') {
+            variaveis->missesLeitura++;
+            variaveis->leiturasMP++;
+        } else {
+            variaveis->missesEscrita++;
+            if (cache->politicaEscrita == 0) {
+                variaveis->escritasMP++;
+            }
+        }
 
-        printf("Endereco: %s, operacao: %c",endereco,operacao);
+        int indiceLinhaASerSubstituida = encontrarBlocoParaSubstituir(cache, indexConjunto);
+        Linha *linha = &conjunto->linhas[indiceLinhaASerSubstituida];
 
-    //buscar se esta na cache
 
-    //se não estiver fazer a substituição
+        //write-back -> escreve na memória principal antes de substituir
+        if (cache->politicaEscrita == 1 && linha->valido && linha->modificado) {
+            variaveis->escritasMP++;
+        }
+
+        linha->tag = tag;
+        linha->valido = 1;
+        linha->modificado = (operacao == 'W' && cache->politicaEscrita == 1);
+        linha->ultimoUso = 0;
+
+    }
 
 }
 
@@ -67,7 +162,7 @@ Cache* inicializarCache(int tamBloco, int numLinhas, int associatividade,
     cache->tamBloco = tamBloco;
     cache->politicaEscrita = politicaEscrita;
     cache->politicaSubstituicao = politicaSubstituicao;
-    cache->hitTime = tempoAcerto;
+    cache->tempoAcerto = tempoAcerto;
     
     cache->conjuntos = (Conjunto*)malloc(cache->numConjuntos * sizeof(Conjunto));
     for (int i = 0; i < cache->numConjuntos; i++) {
@@ -93,16 +188,26 @@ void liberarCache(Cache *cache) {
     free(cache);
 }
 
+void atualizarMP(Cache *cache, Variaveis *vars){
+    int i, j;
+    for(i = 0; i < cache->numConjuntos; i++){
+        for(j = 0; j < cache->tamConjunto; j++){
+             Linha linha = cache->conjuntos[i].linhas[j];
+            if(linha.valido && linha.modificado) vars->escritasMP++;
+        }
+    }
+}
+
 
 int main(){
 
+    srand(time(NULL));
     int escrita, tamLinha, numLinhas, associatividade, tempoAcerto, substituicao;
  
     char arquivoEntrada[100];
     char arquivoSaida[100];
 
     //por enquanto vai ser o de teste
-
     //printf("Digite o nome do arquivo de entrada: ");
     //scanf("%s", arquivoEntrada);
 
@@ -129,6 +234,8 @@ int main(){
     scanf("%d", &substituicao);
 
     Cache *cache = inicializarCache(tamLinha, numLinhas, associatividade, escrita, substituicao, tempoAcerto);
+    Variaveis vars;
+    vars.hitsEscrita = vars.hitsLeitura = vars.missesEscrita = vars.missesLeitura = vars.leiturasMP = vars.escritasMP = 0;
 
     MemoriaPrincipal mem;
     mem.tempoEscrita = 70;
@@ -142,7 +249,28 @@ int main(){
     scanf("%d", &mem.tempoEscrita);
     */
 
-    //acesso(&cache,"07b243a0 R"); 
+    FILE* f = fopen(arquivoEntrada, "r");
+    if (f == NULL) {
+        printf("Erro ao abrir arquivo de entrada.\n");
+        return 0;
+    }
+
+    //deixar o endereco direto em int pra manipular o endereco usando operacoes bitwise, em vez de ficar manpulando strings
+    int endereco; char operacao;
+
+    //%x scaneia hexa
+    while (fscanf(f, "%x %c", &endereco, &operacao) != EOF) {
+         acesso(cache, endereco, operacao, &vars);
+    }
+
+    fclose(f);
+
+    //o enuncido diz que tem q atualizar a MP após o término da simulação (nos casos de write-through)
+    if(cache->politicaEscrita == 1){
+        atualizarMP(cache, &vars);
+    }
+    
+    liberarCache(cache);
 
     return 0;
 }
