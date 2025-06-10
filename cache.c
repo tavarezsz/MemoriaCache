@@ -1,13 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <stdbool.h>
 
 typedef struct {
     int tag;
-    int valido; //indica se o bloco foi carregado da memoria, para evitar ler lixo no inicio do programa quando a cache 
+    bool valido; //indica se o bloco foi carregado da memoria, para evitar ler lixo no inicio do programa quando a cache 
                 //ainda não foi totalmente preenchida
-    int modificado; //dirty
-    int ultimoUso; //para o LRU
+    bool modificado; //dirty
+    short ultimoUso; //para o LRU
 } Linha;
 
 typedef struct{
@@ -24,12 +25,6 @@ typedef struct {
     int politicaSubstituicao; //0 - LRU e 1 - aleatória
     int tempoAcerto;
 } Cache;
-
-//tem que ser configurável pelo usuário, mesmo q pros testes seja sempre 70ns
-typedef struct {
-    int tempoEscrita;
-    int tempoLeitura;
-} MemoriaPrincipal;
 
 typedef struct {
     int hitsLeitura;
@@ -118,7 +113,7 @@ void acesso(Cache *cache, int endereco, char operacao, Variaveis *variaveis){
             if (cache->politicaEscrita == 0) {
                 variaveis->escritasMP++;
             } else {
-                linha->modificado = 1;
+                linha->modificado = true;
             }
         }
            
@@ -148,7 +143,7 @@ void acesso(Cache *cache, int endereco, char operacao, Variaveis *variaveis){
         }
 
         linha->tag = tag;
-        linha->valido = 1;
+        linha->valido = true;
         linha->modificado = (operacao == 'W' && cache->politicaEscrita == 1);
         linha->ultimoUso = 0;
 
@@ -171,8 +166,8 @@ Cache* inicializarCache(int tamBloco, int numLinhas, int associatividade,
     for (int i = 0; i < cache->numConjuntos; i++) {
         cache->conjuntos[i].linhas = (Linha*)malloc(cache->tamConjunto * sizeof(Linha));
         for (int j = 0; j < cache->tamConjunto; j++) {
-            cache->conjuntos[i].linhas[j].valido = 0;
-            cache->conjuntos[i].linhas[j].modificado = 0;
+            cache->conjuntos[i].linhas[j].valido = false;
+            cache->conjuntos[i].linhas[j].modificado = false;
             cache->conjuntos[i].linhas[j].tag = 0;
             cache->conjuntos[i].linhas[j].ultimoUso = 0;
         
@@ -237,19 +232,14 @@ int main(){
     scanf("%d", &substituicao);
 
     Cache *cache = inicializarCache(tamLinha, numLinhas, associatividade, escrita, substituicao, tempoAcerto);
-    Variaveis vars;
-    vars.hitsEscrita = vars.hitsLeitura = vars.missesEscrita = vars.missesLeitura = vars.leiturasMP = vars.escritasMP = 0;
+    Variaveis vars = {0};
 
-    MemoriaPrincipal mem;
-    mem.tempoEscrita = 70;
-    mem.tempoLeitura = 70;
+    
+    int tempoMP = 70;
 
     /*
-    printf("Tempo de leitura da memória principal (ns): ");
-    scanf("%d", &mem.tempoLeitura);
-
-    printf("Tempo de escrita da memória principal (ns): ");
-    scanf("%d", &mem.tempoEscrita);
+    printf("Tempo de leitura/escrita da memória principal (ns): ");
+    scanf("%d", &tempoMP);
     */
 
     FILE* f = fopen(arquivoEntrada, "r");
@@ -268,11 +258,55 @@ int main(){
 
     fclose(f);
 
-    //o enuncido diz que tem q atualizar a MP após o término da simulação (nos casos de write-back)
+    //o enuncido diz que tem q atualizar a MP após o término da simulação (quando necessario)
     if(cache->politicaEscrita == 1){
         atualizarMP(cache, &vars);
     }
+
+    int totalLeituras = vars.hitsLeitura + vars.missesLeitura;
+    int totalEscritas = vars.hitsEscrita + vars.missesEscrita;
+
+    int totalAcessos = totalLeituras + totalEscritas;
+
+    int totalHits = vars.hitsLeitura + vars.hitsEscrita;
+    int totalMisses = vars.missesLeitura + vars.missesEscrita;
+
+    float taxaHitEscrita = (float)vars.hitsEscrita / totalEscritas;
+    float taxaHitLeitura = (float)vars.hitsLeitura / totalLeituras;
+    float taxaHitGlobal =  (float)totalHits / totalAcessos;
+
+    float tempoMedioAcesso = (float)cache->tempoAcerto + (1 - taxaHitGlobal) * tempoMP;
     
+    FILE* saida = fopen(arquivoSaida, "w");
+    if (!saida) {
+        printf("Erro ao criar arquivo de saída.\n");
+        liberarCache(cache);
+        return 0;
+    }
+
+    fprintf(saida, "=== Parâmetros ===\n");
+    fprintf(saida, "Arquivo de entrada: %s\n", arquivoEntrada);
+    fprintf(saida, "Tamanho da linha: %d bytes\n", tamLinha);
+    fprintf(saida, "Número de linhas: %d\n", numLinhas);
+    fprintf(saida, "Associatividade: %d\n", associatividade);
+    fprintf(saida, "Tempo de hit: %d ns\n", tempoAcerto);
+    fprintf(saida, "Política de escrita: %s\n", escrita ? "write-back" : "write-through");
+    fprintf(saida, "Política de substituição: %s\n", substituicao ? "Aleatória" : "LRU");
+
+    fprintf(saida, "\n=== Resultados ===\n");
+    fprintf(saida, "Total de acessos à cache: %d\n", totalAcessos);
+    fprintf(saida, " - Leituras: %d\n", totalLeituras);
+    fprintf(saida, " - Escritas: %d\n", totalEscritas);
+    fprintf(saida, "\nTotal de acessos à memória principal:\n");
+    fprintf(saida, " - Leituras: %d\n", vars.leiturasMP);
+    fprintf(saida, " - Escritas: %d\n", vars.escritasMP);
+    fprintf(saida, "\nTaxas de acerto:\n");
+    fprintf(saida, "  Leituras: %.4f (%d/%d)\n", taxaHitLeitura, vars.hitsLeitura, totalLeituras);
+    fprintf(saida, "  Escritas: %.4f (%d/%d)\n", taxaHitEscrita, vars.hitsEscrita, totalEscritas);
+    fprintf(saida, "  Global: %.4f (%d/%d)\n", taxaHitGlobal, totalHits, totalAcessos);
+    fprintf(saida, "\nTempo médio de acesso: %.4f ns\n", tempoMedioAcesso);
+    
+    fclose(saida);
     liberarCache(cache);
 
     return 0;
