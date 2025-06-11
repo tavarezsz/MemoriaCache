@@ -127,7 +127,13 @@ void acesso(Cache *cache, int endereco, char operacao, Variaveis *variaveis){
                     
             if (cache->politicaEscrita == 0) {
                 variaveis->escritasMP++;
-                return; //write-trough usa no-write-allocate e não altera a cache, escreve só na mp
+                //return; //essa é a linha que eu tenho que validar com o sor
+                // pois write-trough geralmente usa no-write-allocate e não altera a cache, escreve só na mp, então deveria parar aqui
+                //mas nos arquivos que o sor deu, todos os writes são pra linhas que não estão na cache 
+                // (ou seja, nenhum write tem um read pro mesmo endereco)
+                //então se descomentar o return todos os writes serão miss, pq nunca vai ler da memória principal e atualizar a cache 
+                // quando der write-miss pela primeira vez para um determinado endereço
+                //daí a taxa e hit de escrita fica sempre 0
             }
 
             variaveis->leiturasMP++;
