@@ -127,13 +127,8 @@ void acesso(Cache *cache, int endereco, char operacao, Variaveis *variaveis){
                     
             if (cache->politicaEscrita == 0) {
                 variaveis->escritasMP++;
-                //return; //essa é a linha que eu tenho que validar com o sor
-                // pois write-trough geralmente usa no-write-allocate e não altera a cache, escreve só na mp, então deveria parar aqui
-                //mas nos arquivos que o sor deu, todos os writes são pra linhas que não estão na cache 
-                // (ou seja, nenhum write tem um read pro mesmo endereco)
-                //então se descomentar o return todos os writes serão miss, pq nunca vai ler da memória principal e atualizar a cache 
-                // quando der write-miss pela primeira vez para um determinado endereço
-                //daí a taxa e hit de escrita fica sempre 0
+                return; // write-trough geralmente usa no-write-allocate e não altera a cache, escreve só na mp
+                //daí com os arquivos q o sor deu, a taxa de hit da escrita vai ser sempre 0, mas é assim mesmo
             }
 
             variaveis->leiturasMP++;
@@ -196,7 +191,7 @@ void atualizarMP(Cache *cache, Variaveis *vars){
     int i, j;
     for(i = 0; i < cache->numConjuntos; i++){
         for(j = 0; j < cache->tamConjunto; j++){
-             Linha linha = cache->conjuntos[i].linhas[j];
+            Linha linha = cache->conjuntos[i].linhas[j];
             if(linha.valido && linha.modificado) vars->escritasMP++;
         }
     }
@@ -211,7 +206,7 @@ int main(){
     char arquivoEntrada[100];
     char arquivoSaida[100];
 
-    //por enquanto vai ser o de teste
+    //teste.cache o u oficial.cache
     printf("Digite o nome do arquivo de entrada: ");
     scanf("%s", arquivoEntrada);
 
@@ -227,7 +222,7 @@ int main(){
     printf("Associatividade (linhas por conjunto): ");
     scanf("%d", &associatividade);
 
-    //printf("Hit time (ns): "); //sempre 5 ns para os testes
+    //printf("Hit time (ns): "); //sempre 5 ns para as análises
     //scanf("%d", &tempoAcerto);
     tempoAcerto = 5;
 
@@ -275,7 +270,6 @@ int main(){
     int totalAcessos = totalLeituras + totalEscritas;
 
     int totalHits = vars.hitsLeitura + vars.hitsEscrita;
-    int totalMisses = vars.missesLeitura + vars.missesEscrita;
 
     float taxaHitEscrita = (float)vars.hitsEscrita / totalEscritas;
     float taxaHitLeitura = (float)vars.hitsLeitura / totalLeituras;
