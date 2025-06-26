@@ -5,8 +5,7 @@
 
 typedef struct {
     int tag;
-    bool valido; //indica se o bloco foi carregado da memoria, para evitar ler lixo no inicio do programa quando a cache 
-                //ainda não foi totalmente preenchida
+    bool valido; //indica se o bloco foi carregado da memoria
     bool modificado; //dirty
     short ultimoUso; //para o LRU
 } Linha;
@@ -20,7 +19,6 @@ typedef struct {
     int numConjuntos;
     int tamConjunto;
     int tamBloco;
-    //deixar esses campos na cache pra n ter q ficar passando como parametro em tudo
     int politicaEscrita; //0 - write-through e 1 - write-back
     int politicaSubstituicao; //0 - LRU e 1 - aleatória
     int tempoAcerto;
@@ -77,7 +75,7 @@ void acesso(Cache *cache, int endereco, char operacao, Variaveis *variaveis){
     int bitsPalavra = potenciaDeDois(cache->tamBloco);
     int bitsConjunto = potenciaDeDois(cache-> numConjuntos);
 
-    int mascaraConjunto = (1 << bitsConjunto) - 1;  //cria um valor com n 1s no final, sendo n o numero de bits da palavra
+    int mascaraConjunto = (1 << bitsConjunto) - 1;  //gera um valor com n 1s no final, sendo n o numero de bits da palavra
     int indexConjunto = (endereco >> bitsPalavra) & mascaraConjunto; //and para deixar só os bits do conjunto
 
     //a tag é o que sobra
@@ -127,8 +125,7 @@ void acesso(Cache *cache, int endereco, char operacao, Variaveis *variaveis){
                     
             if (cache->politicaEscrita == 0) {
                 variaveis->escritasMP++;
-                return; // write-trough geralmente usa no-write-allocate e não altera a cache, escreve só na mp
-                //daí com os arquivos q o sor deu, a taxa de hit da escrita vai ser sempre 0, mas é assim mesmo
+                return; // write-trough usa no-write-allocate e não altera a cache, escreve só na mp
             }
 
             variaveis->leiturasMP++;
@@ -153,7 +150,7 @@ void acesso(Cache *cache, int endereco, char operacao, Variaveis *variaveis){
 
 
 Cache* inicializarCache(int tamBloco, int numLinhas, int associatividade, 
-                 int politicaEscrita, int politicaSubstituicao, int tempoAcerto) {
+    int politicaEscrita, int politicaSubstituicao, int tempoAcerto) {
     Cache *cache = (Cache*)malloc(sizeof(Cache));
     
     cache->numConjuntos = numLinhas / associatividade;
@@ -163,8 +160,9 @@ Cache* inicializarCache(int tamBloco, int numLinhas, int associatividade,
     cache->politicaSubstituicao = politicaSubstituicao;
     cache->tempoAcerto = tempoAcerto;
     
+    int i;
     cache->conjuntos = (Conjunto*)malloc(cache->numConjuntos * sizeof(Conjunto));
-    for (int i = 0; i < cache->numConjuntos; i++) {
+    for (i = 0; i < cache->numConjuntos; i++) {
         cache->conjuntos[i].linhas = (Linha*)malloc(cache->tamConjunto * sizeof(Linha));
         for (int j = 0; j < cache->tamConjunto; j++) {
             cache->conjuntos[i].linhas[j].valido = false;
@@ -180,7 +178,8 @@ Cache* inicializarCache(int tamBloco, int numLinhas, int associatividade,
 
 
 void liberarCache(Cache *cache) {
-    for (int i = 0; i < cache->numConjuntos; i++) {
+    int i;
+    for (i = 0; i < cache->numConjuntos; i++) {
         free(cache->conjuntos[i].linhas);
     }
     free(cache->conjuntos);
@@ -222,10 +221,9 @@ int main(){
     printf("Associatividade (linhas por conjunto): ");
     scanf("%d", &associatividade);
 
-    //printf("Hit time (ns): "); //sempre 5 ns para as análises
-    //scanf("%d", &tempoAcerto);
-    tempoAcerto = 5;
-
+    printf("Hit time (ns): ");
+    scanf("%d", &tempoAcerto);
+   
     printf("Política de escrita (0 - write-through, 1 - write-back): ");
     scanf("%d", &escrita);
 
@@ -238,10 +236,8 @@ int main(){
     
     int tempoMP = 70;
 
-    /*
     printf("Tempo de leitura/escrita da memória principal (ns): ");
     scanf("%d", &tempoMP);
-    */
 
     FILE* f = fopen(arquivoEntrada, "r");
     if (f == NULL) {
@@ -249,7 +245,7 @@ int main(){
         return 0;
     }
 
-    //deixar o endereco direto em int pra manipular o endereco usando operacoes bitwise, em vez de ficar manpulando strings
+    //deixar o endereco direto em int pra manipular o endereco usando operacoes bitwise
     int endereco; char operacao;
 
     //%x scaneia hexa
@@ -259,7 +255,7 @@ int main(){
 
     fclose(f);
 
-    //o enuncido diz que tem q atualizar a MP após o término da simulação (quando necessario)
+    //atualizar a MP após o término da simulação
     if(cache->politicaEscrita == 1){
         atualizarMP(cache, &vars);
     }
