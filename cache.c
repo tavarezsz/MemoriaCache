@@ -216,15 +216,18 @@ void atualizarMP(Cache *cache, Variaveis *vars){
 int main(){
     srand(time(NULL));
     int escrita, tamLinha, numLinhas, associatividade, tempoAcerto, substituicao;
-    char arquivoEntrada[100];
+    char arquivoEntrada[200];
     char arquivoSaida[100];
     int tempoMP = 70;
 
     printf("Digite o nome do arquivo de entrada: ");
-    scanf("%99s", arquivoEntrada);
+    fgets(arquivoEntrada, sizeof(arquivoEntrada), stdin);
+    arquivoEntrada[strcspn(arquivoEntrada, "\n")] = 0; 
 
     printf("Digite o nome do arquivo de saída: ");
-    scanf("%99s", arquivoSaida);
+    fgets(arquivoSaida, sizeof(arquivoSaida), stdin);
+    arquivoSaida[strcspn(arquivoSaida, "\n")] = 0; 
+
 
     printf("Tamanho do bloco (bytes, potência de 2): ");
     scanf("%d", &tamLinha);
@@ -281,7 +284,7 @@ int main(){
 
     FILE* f = fopen(arquivoEntrada, "r");
     if (f == NULL) {
-        printf("Erro ao abrir arquivo de entrada.\n");
+        perror("Erro ao abrir arquivo de entrada");
         liberarCache(cache);
         return 1;
     }
