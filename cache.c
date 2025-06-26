@@ -56,8 +56,9 @@ void mostrarCache(Cache *cache) {
     printf("|Conjunto | Tag      | Válido| Modif.| Uso   |\n");
     printf("+---------+----------+-------+-------+-------+\n");
     
-    for (int i = 0; i < cache->numConjuntos; i++) {
-        for (int j = 0; j < cache->tamConjunto; j++) {
+    int i, j;
+    for (i = 0; i < cache->numConjuntos; i++) {
+        for (j = 0; j < cache->tamConjunto; j++) {
             Linha linha = cache->conjuntos[i].linhas[j];
             printf("|%-9d| %-10x| %-7d| %-7d| %-6d|\n", 
                    i, linha.tag, linha.valido, linha.modificado, linha.ultimoUso);
@@ -176,11 +177,11 @@ Cache* inicializarCache(int tamBloco, int numLinhas, int associatividade,
     cache->politicaSubstituicao = politicaSubstituicao;
     cache->tempoAcerto = tempoAcerto;
     
-    int i;
+    int i, j;
     cache->conjuntos = (Conjunto*)malloc(cache->numConjuntos * sizeof(Conjunto));
     for (i = 0; i < cache->numConjuntos; i++) {
         cache->conjuntos[i].linhas = (Linha*)malloc(cache->tamConjunto * sizeof(Linha));
-        for (int j = 0; j < cache->tamConjunto; j++) {
+        for (j = 0; j < cache->tamConjunto; j++) {
             cache->conjuntos[i].linhas[j].valido = false;
             cache->conjuntos[i].linhas[j].modificado = false;
             cache->conjuntos[i].linhas[j].tag = 0;
