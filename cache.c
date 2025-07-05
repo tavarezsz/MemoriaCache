@@ -50,23 +50,6 @@ int potenciaDeDois(int n) {
     return potencia;
 }
 
-void mostrarCache(Cache *cache) {
-    printf("\nEstado final da Cache:\n");
-    printf("+---------+----------+-------+-------+-------+\n");
-    printf("|Conjunto | Tag      | Válido| Modif.| Uso   |\n");
-    printf("+---------+----------+-------+-------+-------+\n");
-    
-    int i, j;
-    for (i = 0; i < cache->numConjuntos; i++) {
-        for (j = 0; j < cache->tamConjunto; j++) {
-            Linha linha = cache->conjuntos[i].linhas[j];
-            printf("|%-9d| %-10x| %-7d| %-7d| %-6d|\n", 
-                   i, linha.tag, linha.valido, linha.modificado, linha.ultimoUso);
-        }
-        printf("+---------+----------+-------+-------+-------+\n");
-    }
-}
-
 int encontrarBlocoParaSubstituir(Cache *cache, int indexConjunto){
     int maxUltimoUso = -1;
     int linhaMaxUltimoUso = -1;
@@ -312,9 +295,6 @@ int main(){
     float taxaHitGlobal = totalAcessos > 0 ? (float)totalHits / totalAcessos : 0;
 
     float tempoMedioAcesso = cache->tempoAcerto + (1 - taxaHitGlobal) * tempoMP;
-    
-    //mostrar estado final da cache
-    mostrarCache(cache);
 
     FILE* saida = fopen(arquivoSaida, "w");
     if (!saida) {
